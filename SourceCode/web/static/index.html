@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSET302 Automata Simulator | Topic 14: Mealy ↔ Moore Conversion</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="header-title-box">
+        <h1>
+          <span>⚙️ Automata Theory Simulator</span>
+          <span style="font-size:0.9rem; font-weight:normal; opacity:0.85;">| Topic 14</span>
+        </h1>
+        <p>Mealy ↔ Moore Bidirectional Conversion & Output Behavior Preservation Visualizer</p>
+      </div>
+      <div class="header-badges">
+        <span class="badge badge-outline">Bennett University • SCSET</span>
+        <span class="badge badge-primary">CSET302 Milestone-II</span>
+        <span class="badge badge-accent">Topic 14: Mealy ↔ Moore</span>
+        <span class="badge badge-success">✓ Equivalence Preserved</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Control Toolbar -->
+  <section class="toolbar-section">
+    <div class="toolbar-container">
+      <div class="toolbar-group">
+        <span style="font-size:0.85rem; font-weight:600; color:var(--secondary);">Conversion Mode:</span>
+        <div class="toggle-switch">
+          <button id="toggleMealyToMoore" class="toggle-btn active">Mealy → Moore</button>
+          <button id="toggleMooreToMealy" class="toggle-btn">Moore → Mealy</button>
+        </div>
+      </div>
+
+      <div class="toolbar-group">
+        <span style="font-size:0.85rem; font-weight:600; color:var(--secondary);">Preset Library:</span>
+        <select id="presetSelect" class="form-select" style="min-width: 240px;"></select>
+        <button id="btnLoadPreset" class="btn btn-secondary">Load Preset</button>
+      </div>
+
+      <div class="toolbar-group">
+        <button id="btnDrawDiagram" class="btn btn-primary" title="Draw and create state machine diagram manually on interactive canvas">🎨 Draw Diagram</button>
+        <button id="btnUploadImage" class="btn btn-accent" title="Upload transition table image and auto-convert">📷 Upload Image</button>
+        <button id="btnPasteScreenshot" class="btn btn-secondary" title="Paste screenshot from clipboard (Ctrl+V)">📋 Paste (Ctrl+V)</button>
+        <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
+        <button id="btnNewCustom" class="btn btn-secondary">+ Custom Table</button>
+        <button id="btnExportJson" class="btn btn-secondary" title="Export automaton as JSON">⬇ Export JSON</button>
+        <button id="btnImportJson" class="btn btn-secondary" title="Import automaton from JSON">⬆ Import JSON</button>
+        <input type="file" id="importFileInput" accept=".json" style="display:none;">
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content Layout -->
+  <main class="main-container">
+
+    <!-- Dual Workspace Grid -->
+    <div class="dual-workspace">
+
+      <!-- Left: Source Automaton -->
+      <div class="machine-card">
+        <div class="machine-card-header">
+          <h2 id="sourceTitle">Source Automaton</h2>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <button id="btnEditCurrentDiagram" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" title="Edit this diagram visually">✏️ Edit Diagram</button>
+            <span class="badge badge-primary" id="sourceBadge">Source</span>
+          </div>
+        </div>
+        <div class="tuple-summary" id="sourceTuple">
+          Loading tuple definition...
+        </div>
+        <div class="canvas-container">
+          <svg id="sourceSvg"></svg>
+          <div class="canvas-legend">State Diagram (SVG Visualizer)</div>
+        </div>
+        <div class="table-wrapper" id="sourceTable">
+          Loading transition table...
+        </div>
+      </div>
+
+      <!-- Center: Action Divider -->
+      <div class="conversion-divider">
+        <button id="btnConvert" class="btn btn-primary convert-btn-large">
+          Convert Mealy → Moore <span style="font-size:1.1rem">➔</span>
+        </button>
+
+        <div class="options-pill" id="startOutputContainer">
+          <label for="defaultStartOutput" style="font-weight:600; display:block; margin-bottom:4px;">
+            Start Output λ(q₀)
+          </label>
+          <input type="text" id="defaultStartOutput" class="form-input" value="0" maxlength="4" style="width:70px; text-align:center;">
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Mealy → Moore init symbol</div>
+        </div>
+      </div>
+
+      <!-- Right: Converted Automaton -->
+      <div class="machine-card">
+        <div class="machine-card-header">
+          <h2 id="convertedTitle">Converted Automaton</h2>
+          <span class="badge badge-success" id="convertedBadge">Equivalent</span>
+        </div>
+        <div class="tuple-summary" id="convertedTuple">
+          Converted tuple will be displayed after execution.
+        </div>
+        <div class="canvas-container">
+          <svg id="convertedSvg"></svg>
+          <div class="canvas-legend">Converted State Diagram</div>
+        </div>
+        <div class="table-wrapper" id="convertedTable">
+          Conversion pending...
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Tabs Section -->
+    <div class="card-section">
+      <div class="tabs-header">
+        <button class="tab-btn active" data-tab="tab-simulation">▶ Synchronized String Simulation</button>
+        <button class="tab-btn" data-tab="tab-steps">📝 Step-by-Step Conversion Walkthrough</button>
+        <button class="tab-btn" data-tab="tab-verification">🧪 Equivalence & Test Suite (M2 Rubric)</button>
+        <button class="tab-btn" data-tab="tab-theory">📚 Formal Automata Theory & Math</button>
+      </div>
+
+      <!-- TAB 1: Synchronized String Simulation -->
+      <div class="tab-pane active" id="tab-simulation">
+        <div class="sim-controls">
+          <div style="display:flex; align-items:center; gap:0.5rem; flex:1; min-width:300px;">
+            <label for="inputString" style="font-weight:600; font-size:0.875rem;">Test String w:</label>
+            <input type="text" id="inputString" class="form-input" value="101" placeholder="Enter input symbols, e.g. 101, 00110..." style="flex:1; font-family:var(--font-mono);">
+            <button id="btnSimulate" class="btn btn-primary">Simulate</button>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <span style="font-size:0.8rem; color:var(--text-muted);">Quick Strings:</span>
+            <button class="btn btn-secondary test-pill" style="padding:0.25rem 0.6rem; font-size:0.75rem;">101</button>
+            <button class="btn btn-secondary test-pill" style="padding:0.25rem 0.6rem; font-size:0.75rem;">00110</button>
+            <button class="btn btn-secondary test-pill" style="padding:0.25rem 0.6rem; font-size:0.75rem;">1101</button>
+            <button class="btn btn-secondary test-pill" style="padding:0.25rem 0.6rem; font-size:0.75rem;">10101</button>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.4rem;">
+            <button id="btnResetSim" class="btn btn-secondary" title="Reset to start">⏮</button>
+            <button id="btnStepBack" class="btn btn-secondary" title="Step Back">◀ Step</button>
+            <button id="btnStepForward" class="btn btn-secondary" title="Step Forward">Step ▶</button>
+            <button id="btnPlayPause" class="btn btn-accent">▶ Play</button>
+            <span style="font-size:0.75rem; margin-left:0.5rem; color:var(--secondary);">Speed:</span>
+            <input type="range" id="simSpeedRange" min="200" max="1300" value="600" style="width:80px;">
+          </div>
+        </div>
+
+        <!-- Synchronized Tape Comparison Display -->
+        <div class="tape-container">
+          <!-- Input Tape -->
+          <div class="tape-row">
+            <div class="tape-label">Input String (w):</div>
+            <div class="tape-cells" id="inputTapeCells"></div>
+          </div>
+          <!-- Source Machine Output Tape -->
+          <div class="tape-row">
+            <div class="tape-label" id="sourceTapeLabel">Source Output:</div>
+            <div class="tape-cells" id="sourceTapeCells"></div>
+          </div>
+          <!-- Converted Machine Output Tape -->
+          <div class="tape-row">
+            <div class="tape-label" id="convertedTapeLabel">Converted Output:</div>
+            <div class="tape-cells" id="convertedTapeCells"></div>
+          </div>
+        </div>
+
+        <!-- Simulation Progress & State Trace Log -->
+        <div class="sim-status-box" id="simLogBox">
+          Click "Simulate" to trace state transitions and compare output sequences side-by-side.
+        </div>
+      </div>
+
+      <!-- TAB 2: Step-by-Step Conversion Walkthrough -->
+      <div class="tab-pane" id="tab-steps">
+        <div id="conversionSummary"></div>
+        <div class="steps-timeline" id="stepsContainer">
+          <p style="color:var(--text-muted); text-align:center; padding:2rem;">
+            Select an automaton and click "Convert" to generate detailed algorithmic steps.
+          </p>
+        </div>
+      </div>
+
+      <!-- TAB 3: Equivalence & Test Suite -->
+      <div class="tab-pane" id="tab-verification">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <div>
+            <h3 style="font-size:1.05rem; font-weight:700;">Milestone-II Verification & Test Cases</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted);">
+              Automated evaluation table adhering to Section 5 ("Testing and verification: sample template") of the CSET302 Project Guide.
+            </p>
+          </div>
+          <button id="btnRunAllTests" class="btn btn-success">▶ Run Complete Test Suite</button>
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:70px;">Test ID</th>
+              <th>Input String (w)</th>
+              <th>Moore Output</th>
+              <th>Mealy Output</th>
+              <th>Expected Formal Relation</th>
+              <th style="width:100px;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="verificationTableBody">
+            <tr>
+              <td colspan="6" style="padding:1.5rem; text-align:center; color:var(--text-muted);">
+                Run conversion to populate test case verification results.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- TAB 4: Formal Automata Theory & Math -->
+      <div class="tab-pane" id="tab-theory">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+          <div style="background:#f8fafc; padding:1.25rem; border-radius:var(--radius-md); border:1px solid var(--border);">
+            <h4 style="color:var(--primary); font-size:1rem; margin-bottom:0.5rem;">1. Moore Machine Formal 6-Tuple</h4>
+            <p style="font-family:var(--font-mono); font-size:0.85rem; margin-bottom:0.75rem;">M = (Q, Σ, Δ, δ, λ, q₀)</p>
+            <ul style="font-size:0.85rem; line-height:1.7; padding-left:1.2rem; color:var(--secondary);">
+              <li><strong>Q:</strong> Finite set of states</li>
+              <li><strong>Σ:</strong> Finite input alphabet</li>
+              <li><strong>Δ:</strong> Finite output alphabet</li>
+              <li><strong>δ:</strong> Transition function <code>Q × Σ → Q</code></li>
+              <li><strong>λ:</strong> State output function <code>Q → Δ</code></li>
+              <li><strong>q₀:</strong> Initial state in <code>Q</code></li>
+            </ul>
+            <p style="font-size:0.85rem; margin-top:0.75rem; color:#475569;">
+              <strong>Output Behavior:</strong> For input string of length <em>n</em>, the Moore machine produces an output string of length <em>n + 1</em>, emitting λ(q₀) before consuming any input symbol.
+            </p>
+          </div>
+
+          <div style="background:#f8fafc; padding:1.25rem; border-radius:var(--radius-md); border:1px solid var(--border);">
+            <h4 style="color:var(--accent); font-size:1rem; margin-bottom:0.5rem;">2. Mealy Machine Formal 6-Tuple</h4>
+            <p style="font-family:var(--font-mono); font-size:0.85rem; margin-bottom:0.75rem;">M = (Q, Σ, Δ, δ, λ', q₀)</p>
+            <ul style="font-size:0.85rem; line-height:1.7; padding-left:1.2rem; color:var(--secondary);">
+              <li><strong>Q:</strong> Finite set of states</li>
+              <li><strong>Σ:</strong> Finite input alphabet</li>
+              <li><strong>Δ:</strong> Finite output alphabet</li>
+              <li><strong>δ:</strong> Transition function <code>Q × Σ → Q</code></li>
+              <li><strong>λ':</strong> Transition output function <code>Q × Σ → Δ</code></li>
+              <li><strong>q₀:</strong> Initial state in <code>Q</code></li>
+            </ul>
+            <p style="font-size:0.85rem; margin-top:0.75rem; color:#475569;">
+              <strong>Output Behavior:</strong> For input string of length <em>n</em>, the Mealy machine produces an output string of length exactly <em>n</em>, emitting outputs on the transition edges.
+            </p>
+          </div>
+        </div>
+
+        <div style="margin-top:1.5rem; background:#eff6ff; padding:1.25rem; border-radius:var(--radius-md); border-left:4px solid var(--primary);">
+          <h4 style="color:var(--primary-dark); font-size:0.95rem; margin-bottom:0.4rem;">3. Fundamental Equivalence Theorem</h4>
+          <p style="font-size:0.875rem; color:var(--text-main); line-height:1.6;">
+            A Moore machine <em>M_moore</em> and a Mealy machine <em>M_mealy</em> are defined to be equivalent if and only if for every input string <em>w ∈ Σ*</em>:
+            <br>
+            <code style="background:white; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:0.95rem; display:inline-block; margin-top:4px;">
+              Output_moore(w) = λ(q₀) · Output_mealy(w)
+            </code>
+          </p>
+          <p style="font-size:0.85rem; color:var(--secondary); margin-top:0.5rem;">
+            For non-empty strings, ignoring the 1-symbol start state prefix λ(q₀), both machines produce identical output sequences at every computational step.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Modal for Image Upload & OCR Conversion -->
+  <div class="modal-overlay" id="imageOcrModal">
+    <div class="modal-content" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 style="font-size:1.15rem; font-weight:700;">📷 Image & Screenshot Converter (OCR)</h3>
+        <button id="btnCloseImageModal" style="border:none; background:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Paste dropzone container -->
+        <div id="pasteDropZone" style="border: 2px dashed var(--primary); background: var(--primary-light); padding: 1.25rem; border-radius: var(--radius-md); text-align: center; cursor: pointer; margin-bottom: 1rem;">
+          <div style="font-size: 1.6rem; margin-bottom: 0.35rem;">📋</div>
+          <div style="font-weight: 700; color: var(--primary-dark); font-size: 0.95rem;">
+            Press Ctrl+V to Paste Screenshot Directly!
+          </div>
+          <div style="font-size: 0.8rem; color: var(--secondary); margin-top: 0.25rem;">
+            or click this area to browse and upload an image file
+          </div>
+        </div>
+
+        <div id="imageOcrLoading" style="display:none; text-align:center; padding:2rem;">
+          <div style="font-size:1.8rem; margin-bottom:0.5rem;">⚙️</div>
+          <p style="font-weight:600; color:var(--primary);">Processing image with RapidOCR engine...</p>
+          <p style="font-size:0.8rem; color:var(--text-muted);">Extracting transition table and detecting machine type...</p>
+        </div>
+
+        <div id="imageOcrResultContent">
+          <div style="display:flex; gap:1rem; align-items:center; background:#eff6ff; padding:0.85rem 1rem; border-radius:var(--radius-md); border-left:4px solid var(--primary); margin-bottom:1rem;">
+            <div>
+              <div style="font-weight:700; color:var(--primary-dark);" id="ocrDetectedBadge">Detected: Mealy Machine</div>
+              <div style="font-size:0.8rem; color:var(--secondary);" id="ocrSummaryText">Successfully parsed 3 states and complete transitions.</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:4px;">Detected OCR Text Lines:</label>
+            <div id="ocrRawLines" style="background:#0f172a; color:#f8fafc; font-family:var(--font-mono); font-size:0.8rem; padding:0.75rem; border-radius:var(--radius-sm); max-height:120px; overflow-y:auto;"></div>
+          </div>
+
+          <div>
+            <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:4px;">Extracted Machine Definition:</label>
+            <div id="ocrMachineOverview" style="font-size:0.85rem; background:#f8fafc; border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm);"></div>
+          </div>
+
+          <div style="margin-top:1rem; padding:0.75rem; background:#fffbeb; border:1px solid #fde68a; border-radius:var(--radius-sm); font-size:0.78rem; color:#92400e;">
+            💡 <strong>Quick Test:</strong> You can also test with pre-bundled sample images from <code>TestCases/sample_images/</code>!
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnCancelImageModal" class="btn btn-secondary">Close</button>
+        <button id="btnApplyImageConversion" class="btn btn-success">✓ Load & Convert Result</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Custom Machine Builder -->
+  <div class="modal-overlay" id="customModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size:1.15rem; font-weight:700;">Custom Automaton Builder</h3>
+        <button id="btnCloseModal" style="border:none; background:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div>
+            <label style="font-size:0.8rem; font-weight:600;">Automaton Type:</label>
+            <select id="customMachineType" class="form-select" style="width:100%;">
+              <option value="Mealy">Mealy Machine</option>
+              <option value="Moore">Moore Machine</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:600;">Machine Name:</label>
+            <input type="text" id="customMachineName" class="form-input" style="width:100%;" value="My Custom Machine">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:0.75rem;">
+          <div>
+            <label style="font-size:0.8rem; font-weight:600;">States Q:</label>
+            <input type="text" id="customStates" class="form-input" style="width:100%;" value="q0, q1">
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:600;">Alphabet Σ:</label>
+            <input type="text" id="customAlphabet" class="form-input" style="width:100%;" value="0, 1">
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:600;">Output Δ:</label>
+            <input type="text" id="customOutputs" class="form-input" style="width:100%;" value="0, 1">
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:600;">Start State q₀:</label>
+            <input type="text" id="customStartState" class="form-input" style="width:100%;" value="q0">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:4px;">
+            Transitions & Output Specification:
+          </label>
+          <textarea id="customDefinitionArea" class="form-input" rows="7" style="width:100%; font-family:var(--font-mono); font-size:0.85rem;"></textarea>
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+            For Mealy: <code>from_state, symbol -> to_state, output</code> (e.g. <code>q0, 0 -> q0, 1</code>)
+            <br>
+            For Moore: State output <code>q0 -> 0</code>, Transitions <code>q0, 0 -> q1</code>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnCancelModal" class="btn btn-secondary">Cancel</button>
+        <button id="btnSaveCustomMachine" class="btn btn-primary">Save & Load Automaton</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Interactive State Diagram Studio (Manual Diagram Creator) -->
+  <div class="modal-overlay" id="diagramStudioModal">
+    <div class="modal-content" style="max-width: 1200px; width: 95vw; height: 90vh;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <span style="font-size:1.4rem;">🎨</span>
+          <div>
+            <h3 style="font-size:1.15rem; font-weight:700; margin:0;">State Diagram Visual Studio</h3>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin:0;">
+              Create, draw, connect, and reposition states manually, then convert between Mealy & Moore machines.
+            </p>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <select id="studioMachineType" class="form-select" style="font-size:0.85rem; padding:0.35rem 0.75rem;">
+            <option value="Mealy">Mealy Machine (Outputs on Transitions)</option>
+            <option value="Moore">Moore Machine (Outputs in States)</option>
+          </select>
+          <button id="btnCloseStudioModal" style="border:none; background:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" style="padding:0; display:flex; flex:1; overflow:hidden;">
+        <!-- Studio Left: Visual Drawing Board -->
+        <div style="flex:1 1 0; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--border);">
+          <!-- Tool bar -->
+          <div class="studio-toolbar">
+            <div class="studio-tool-group">
+              <button id="toolSelect" class="studio-tool-btn active" title="Select & Drag States">
+                👆 Move / Select
+              </button>
+              <button id="toolAddState" class="studio-tool-btn" title="Click canvas to drop a new state">
+                🔘 + Add State
+              </button>
+              <button id="toolAddTransition" class="studio-tool-btn" title="Click a state then click another to connect">
+                ➡️ + Transition
+              </button>
+              <button id="toolDelete" class="studio-tool-btn" title="Delete selected state or transition">
+                🗑️ Delete Selected
+              </button>
+            </div>
+            <div class="studio-tool-group">
+              <button id="btnStudioResetCircle" class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.6rem;">
+                🔄 Auto-Arrange
+              </button>
+              <button id="btnStudioClear" class="btn btn-secondary" style="font-size:0.78rem; padding:0.3rem 0.6rem; color:var(--danger);">
+                🧹 Clear Canvas
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Drawing SVG Canvas with Grid -->
+          <div class="studio-canvas-wrapper" id="studioCanvasWrapper">
+            <svg id="studioSvg" style="width:100%; height:100%; cursor:default;"></svg>
+            <div class="studio-canvas-hint" id="studioCanvasHint">
+              Click anywhere on the canvas to place a new state.
+            </div>
+          </div>
+        </div>
+
+        <!-- Studio Right: Properties & Real-Time Transition Table -->
+        <div style="width:330px; flex:0 0 330px; min-width:300px; background:var(--bg-subtle); display:flex; flex-direction:column; overflow-y:auto; padding:1rem; gap:1rem;">
+          <div class="studio-panel-card">
+            <h4 style="font-size:0.85rem; font-weight:700; margin-bottom:0.5rem; color:var(--secondary);">
+              Selected State Properties
+            </h4>
+            <div id="studioNodeInspector">
+              <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">
+                Select a state on the canvas to edit its name, start status, or output.
+              </p>
+            </div>
+          </div>
+
+          <div class="studio-panel-card" style="flex:1; display:flex; flex-direction:column;">
+            <h4 style="font-size:0.85rem; font-weight:700; margin-bottom:0.5rem; color:var(--secondary);">
+              Live Transition Table Preview
+            </h4>
+            <div id="studioLiveTable" style="flex:1; overflow-y:auto; font-size:0.78rem;">
+              <!-- Live Table will render here -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-size:0.8rem; color:var(--text-muted);">
+          💡 <em>Tip: With <strong>+ Transition</strong> selected, click source state then target state (or same state for self-loop).</em>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button id="btnCancelStudio" class="btn btn-secondary">Cancel</button>
+          <button id="btnApplyStudioMachine" class="btn btn-success">
+            ✓ Apply Diagram & Convert Result ➔
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transition Input Prompt Modal -->
+  <div class="transition-modal-overlay" id="transitionPromptModal">
+    <div class="transition-prompt-card">
+      <h4 style="font-size:1rem; font-weight:700; margin-bottom:0.75rem;" id="transPromptTitle">Add Transition</h4>
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:3px;">Input Symbol (a ∈ Σ):</label>
+        <input type="text" id="promptInputSymbol" class="form-input" style="width:100%;" value="0" maxlength="3">
+      </div>
+      <div style="margin-bottom:1rem;" id="promptOutputContainer">
+        <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:3px;">Transition Output (y ∈ Δ):</label>
+        <input type="text" id="promptOutputSymbol" class="form-input" style="width:100%;" value="0" maxlength="3">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button id="btnCancelTransitionPrompt" class="btn btn-secondary" style="font-size:0.8rem;">Cancel</button>
+        <button id="btnConfirmTransitionPrompt" class="btn btn-primary" style="font-size:0.8rem;">Add Edge</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div><strong>CSET302 Automata Theory and Computability</strong> • Milestone-II Final Simulator Evaluation</div>
+    <div style="margin-top:0.35rem; color:#64748b;">
+      School of Computer Science Engineering and Technology (SCSET), Bennett University (The Times Group)
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+{
+  "test_cases": [
+    {
+      "id": "T01",
+      "category": "Normal Conversion",
+      "feature": "Moore to Mealy conversion (Residue Modulo 3)",
+      "preset_id": "moore_mod_3",
+      "test_inputs": ["", "0", "1", "00", "01", "10", "11", "101", "1101"],
+      "expected_status": "Pass",
+      "description": "Verifies state/alphabet preservation, direct transition output assignment lambda'(q, a) = lambda(dest), and strict output equivalence."
+    },
+    {
+      "id": "T02",
+      "category": "State Splitting",
+      "feature": "Mealy to Moore state splitting (Sequence Detector '101')",
+      "preset_id": "mealy_seq_101",
+      "test_inputs": ["", "0", "1", "10", "101", "10101", "110101"],
+      "expected_status": "Pass",
+      "description": "State q1 receives incoming outputs 0 and 1, forcing state splitting into q1_0 and q1_1. Tests correct split transition mapping and equivalence."
+    },
+    {
+      "id": "T03",
+      "category": "Arithmetic Machine",
+      "feature": "1's Complement Generator Equivalence",
+      "preset_id": "mealy_ones_complement",
+      "test_inputs": ["0", "1", "01", "10", "0000", "1111", "101010"],
+      "expected_status": "Pass",
+      "description": "Tests bit inversion where every input bit x is replaced by ~x. Verifies output behavior is preserved across multiple bit sequences."
+    },
+    {
+      "id": "T04",
+      "category": "Arithmetic Machine",
+      "feature": "2's Complement Generator (LSB-first) Conversion",
+      "preset_id": "mealy_twos_complement",
+      "test_inputs": ["0", "1", "00", "01", "10", "11", "0100", "1011"],
+      "expected_status": "Pass",
+      "description": "Tests memory of first '1' bit, ensuring states retain output behavior across conversion."
+    },
+    {
+      "id": "T05",
+      "category": "Boundary Case",
+      "feature": "Empty string ε processing",
+      "preset_id": "moore_mod_3",
+      "test_inputs": [""],
+      "expected_status": "Pass",
+      "description": "Moore machine outputs lambda(q0) of length 1, while Mealy outputs empty string of length 0. Preserves Moore(ε) = lambda(q0) · Mealy(ε)."
+    },
+    {
+      "id": "T06",
+      "category": "Edge Case",
+      "feature": "Single-state Mealy machine conversion",
+      "preset_id": "mealy_ones_complement",
+      "test_inputs": ["0101"],
+      "expected_status": "Pass",
+      "description": "A single-state Mealy machine with self-loops having multiple outputs (0 and 1) splits correctly into two Moore states."
+    },
+    {
+      "id": "T07",
+      "category": "Reachability & Pruning",
+      "feature": "Unreachable state detection and pruning",
+      "custom_test": "unreachable_test",
+      "expected_status": "Pass",
+      "description": "Ensures that candidate split states that cannot be reached from the new start state are properly detected and pruned."
+    },
+    {
+      "id": "T08",
+      "category": "Input Validation",
+      "feature": "Unknown symbol outside input alphabet",
+      "preset_id": "moore_mod_3",
+      "test_inputs": ["012", "abc", "10X01"],
+      "expected_status": "Validation error caught",
+      "description": "Ensures the simulator rejects invalid characters with a descriptive error rather than undefined runtime crash."
+    },
+    {
+      "id": "T09",
+      "category": "Automaton Validation",
+      "feature": "Incomplete DFA missing transitions",
+      "custom_test": "missing_transition_test",
+      "expected_status": "Validation error caught",
+      "description": "Fails validation if any state has undefined transition delta(q, a) according to the project guidance rules."
+    },
+    {
+      "id": "T10",
+      "category": "Stress Test",
+      "feature": "50-symbol pseudo-random binary stream simulation",
+      "preset_id": "mealy_seq_101",
+      "test_inputs": ["10101011001010101010011101010101000101010101110101"],
+      "expected_status": "Pass",
+      "description": "Stress-tests conversion on long strings to verify zero divergence in output behaviour across 50 steps."
+    }
+  ]
+}
